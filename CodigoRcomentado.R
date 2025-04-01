@@ -191,3 +191,143 @@ plot_ly(data = df_cargas,
   layout(title = "PCA Loadings (interactivo)",
          xaxis = list(title = "PC1"),
          yaxis = list(title = "PC2"))
+
+
+#2. ANÁLISIS ESTADÍSTICO
+#2.1 Filtrado de datos de pacientes con cáncer y sanos
+# Extraer datos del SE filtrado
+datos <- assay(se_filtrado) #ojo que con esto sobreescribo "datos" quer era como había llamado inicialmente las cosas
+metainfo <- colData(se_filtrado)
+
+# Filtrar solo GC y HE (excluye QC y BN)
+idx_gc_he <- metainfo$Class %in% c("GC", "HE")
+datos_gc_he <- datos[, idx_gc_he]
+metainfo_gc_he <- metainfo[idx_gc_he, ]
+
+#2.2 Test de Wilcoxon
+# Función para comparar cada metabolito
+comparar_metabolito <- function(x, grupo) {
+  grupo1 <- x[grupo == "GC"]
+  grupo2 <- x[grupo == "HE"]
+  
+  # Test de Wilcoxon
+  test <- wilcox.test(grupo1, grupo2)
+  
+  # Fold change (GC / HE)
+  fc <- median(grupo1, na.rm = TRUE) / median(grupo2, na.rm = TRUE)
+  
+  data.frame(p_value = test$p.value, 
+             fold_change = fc)
+}
+# Aplicar a cada metabolito
+grupo <- metainfo_gc_he$Class
+resultados <- apply(datos_gc_he, 1, comparar_metabolito, grupo = grupo)
+# Convertir a tabla
+tabla_resultados <- do.call(rbind, resultados)
+tabla_resultados <- as.data.frame(tabla_resultados)
+tabla_resultados$metabolito <- rownames(tabla_resultados)
+# Ajustar p-valores por FDR
+tabla_resultados$adj_p <- p.adjust(tabla_resultados$p_value, method = "fdr")
+# Ordenar por significancia
+tabla_ordenada <- tabla_resultados %>% arrange(p_value)
+head(tabla_ordenada)
+# Añadir el nombre del metabolito para que sea más legible
+# Convertir rowData a data.frame que llamo metanombres
+metanombres <- as.data.frame(rowData(se_filtrado))
+# Añadir identificador como fila para hacer merge
+metanombres$metabolito <- rownames(metanombres)
+# Juntar con la tabla ordenada
+tabla_con_nombres <- tabla_ordenada %>%
+  left_join(metanombres %>% select(metabolito, Label), by = "metabolito") %>%
+  relocate(Label, .after = metabolito)  # mover el nombre al lado del código
+head(tabla_con_nombres)
+
+# 2.3 VOLCANO PLOT
+# Añadir columnas a la tabla
+tabla_con_nombres <- tabla_con_nombres %>%
+  mutate(log2FC = log2(fold_change),
+         negLogP = -log10(p_value),
+         Significativo = case_when(
+           adj_p < 0.05 & log2FC > 1 ~ "GC ↑",
+           adj_p < 0.05 & log2FC < -1 ~ "HE ↑",
+           TRUE ~ "No significativo"
+         ))
+# señalo en rojo los aumentados en cáncer y en azul los aumentados en sanos 
+# (en realidad son los disminuidos en cáncer, que es lo mismo que decir los aumentados 
+# en sanos)
+ggplot(tabla_con_nombres, aes(x = log2FC, y = negLogP, color = Significativo)) +
+  geom_point() +
+  geom_vline(xintercept = c(-1, 1), linetype = "dotted") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red") +
+  scale_color_manual(values = c("GC ↑" = "red", "HE ↑" = "blue", "No significativo" = "grey")) +
+  labs(title = "Volcano plot: GC vs HE",
+       x = "log2(Fold Change)",
+       y = "-log10(p-valor)") +
+  theme_minimal()
+# Guardo la tabla
+write.csv(tabla_con_nombres, "Resultados_GC_vs_HE.csv", row.names = FALSE)
+
+#Confirmación de que el test no-paramétrico era la opción adecuada
+#Compruebo normalidad y homogeneidad de varianzas
+# Crear función que evalúe por metabolito
+evaluar_metabolito <- function(x, grupo) {
+  # Separar los valores por grupo
+  valores_gc <- x[grupo == "GC"]
+  valores_he <- x[grupo == "HE"]
+  
+  # Calcular medias
+  media_gc <- mean(valores_gc, na.rm = TRUE)
+  media_he <- mean(valores_he, na.rm = TRUE)
+  
+  # IC 95% (asumiendo t-distribución)
+  n_gc <- sum(!is.na(valores_gc))
+  n_he <- sum(!is.na(valores_he))
+  se_gc <- sd(valores_gc, na.rm = TRUE) / sqrt(n_gc)
+  se_he <- sd(valores_he, na.rm = TRUE) / sqrt(n_he)
+  ic95_gc <- c(media_gc - 1.96 * se_gc, media_gc + 1.96 * se_gc)
+  ic95_he <- c(media_he - 1.96 * se_he, media_he + 1.96 * se_he)
+  
+  # Shapiro para normalidad
+  shapiro_gc <- if (length(valores_gc) >= 3) shapiro.test(valores_gc)$p.value else NA
+  shapiro_he <- if (length(valores_he) >= 3) shapiro.test(valores_he)$p.value else NA
+  
+  # Levene test
+  df_tmp <- data.frame(valores = c(valores_gc, valores_he),
+                       grupo = rep(c("GC", "HE"), times = c(length(valores_gc), length(valores_he))))
+  p_levene <- if (nrow(df_tmp) >= 4) leveneTest(valores ~ grupo, data = df_tmp)$`Pr(>F)`[1] else NA
+  
+  # Indicadores lógicos
+  normalidad_gc <- !is.na(shapiro_gc) && shapiro_gc >= 0.05
+  normalidad_he <- !is.na(shapiro_he) && shapiro_he >= 0.05
+  homogeneidad <- !is.na(p_levene) && p_levene >= 0.05
+  
+  # Resultado
+  data.frame(
+    media_gc = media_gc,
+    ic95_gc_inf = ic95_gc[1],
+    ic95_gc_sup = ic95_gc[2],
+    media_he = media_he,
+    ic95_he_inf = ic95_he[1],
+    ic95_he_sup = ic95_he[2],
+    p_shapiro_gc = shapiro_gc,
+    p_shapiro_he = shapiro_he,
+    p_levene = p_levene,
+    cumple_shapiro_gc = normalidad_gc,
+    cumple_shapiro_he = normalidad_he,
+    cumple_levene = homogeneidad
+  )
+}
+
+# Aplicar a todos los metabolitos
+resultados_supuestos <- apply(datos_gc_he, 1, evaluar_metabolito, grupo = grupo)
+
+# Convertir lista en tabla
+tabla_supuestos <- bind_rows(resultados_supuestos, .id = "metabolito")
+
+# Añadir nombres de metabolitos
+tabla_supuestos <- tabla_supuestos %>%
+  left_join(metanombres %>% select(metabolito, Label), by = "metabolito") %>%
+  relocate(Label, .after = metabolito)
+
+# Ver los primeros resultados
+head(tabla_supuestos)
