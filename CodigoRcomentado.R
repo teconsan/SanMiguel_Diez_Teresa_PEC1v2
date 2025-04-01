@@ -45,9 +45,7 @@ library(pheatmap)#clustering
 library(dplyr)
 library(ggplot2) #para graficos
 library(car)   # Para el test de Levene
-library(broom) # Para tidy() si se quiere procesar resultados de test
 library(tibble)  # Para trabajar más cómodo con tablas
-library(tidyr)   # Para pivotear si hiciera falta
 library(caret)  #Para machinelearning-partición estratificada
 library(mixOmics) #Para crear el modelo de machinelearning
 
