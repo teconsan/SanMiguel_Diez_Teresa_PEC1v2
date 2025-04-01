@@ -29,6 +29,10 @@ if (!requireNamespace("pheatmap", quietly = TRUE)) {
   install.packages("pheatmap")
 }
 
+if (!requireNamespace("caret", quietly = TRUE)) install.packages("caret")#Machinelearning
+
+
+
 #LIBRERÍAS UTILIZADAS
 library(Biobase)
 library(readxl) #para abrir xlsx
@@ -44,6 +48,8 @@ library(car)   # Para el test de Levene
 library(broom) # Para tidy() si se quiere procesar resultados de test
 library(tibble)  # Para trabajar más cómodo con tablas
 library(tidyr)   # Para pivotear si hiciera falta
+library(caret)  #Para machinelearning-partición estratificada
+library(mixOmics) #Para crear el modelo de machinelearning
 
 #EXPLORACIÓN DEL FICHERO SELECCIONADO
 
@@ -331,3 +337,67 @@ tabla_supuestos <- tabla_supuestos %>%
 
 # Ver los primeros resultados
 head(tabla_supuestos)
+
+# MACHINE LEARNING
+# 1.Preparación
+#Extraer los datos de la matriz de expresión y de la metainformación
+datos <- assay(se_filtrado)
+metainfo <- colData(se_filtrado)
+
+# Filtrar GC y HE
+idx_gc_he <- metainfo$Class %in% c("GC", "HE")
+datos_gc_he <- datos[, idx_gc_he]
+metainfo_gc_he <- metainfo[idx_gc_he, ]
+
+# 1.1 Transponer y transformar los datos
+#A seguramos que estén en formato muestras × metabolitos, y luego imputamos
+# Transponer: filas = muestras, columnas = metabolitos
+datos_gc_he_t <- t(datos_gc_he)
+# Log10 (+1 para evitar log(0))
+datos_log <- log10(datos_gc_he_t + 1)
+# Imputar con kNN
+datos_knn <- kNN(as.data.frame(datos_log), k = 3, imp_var = FALSE)
+datos_knn <- as.matrix(datos_knn)
+
+# 1.2 Dividir entre train y test 75/25
+set.seed(123)  # reproducibilidad
+# Dividir
+particion <- createDataPartition(metainfo_gc_he$Class, p = 0.75, list = FALSE)
+# Crear subconjuntos
+datos_train <- datos_knn[particion, ]
+datos_test  <- datos_knn[-particion, ]
+
+metainfo_train <- metainfo_gc_he[particion, ]
+metainfo_test  <- metainfo_gc_he[-particion, ]
+
+# 1.3 Escalado Z-score. Esto se hace con medias y SD del train.  
+# Escalar train
+datostrain_escalado <- scale(datos_train)
+# Guardar medias y SD
+media_train <- attr(datostrain_escalado, "scaled:center")
+sd_train <- attr(datostrain_escalado, "scaled:scale")
+# Escalar test usando media y SD del train
+datostest_escalado <- scale(datos_test, center = media_train, scale = sd_train)
+
+# 2. Crear modelo PLS-DA y entrenarlo
+# Me baso en el tutorial para elegir dos componentes. Todavía no conozco estas herramientas
+# Convertir clases a factor
+Y_train <- factor(metainfo_train$Class, levels = c("HE", "GC"))
+# Entrenar modelo PLS-DA
+modelo_plsda_final <- plsda(datostrain_escalado, Y_train, ncomp = 2)
+
+
+# 3. Evaluar la validez del modelo creado
+set.seed(123)
+perf_plsda <- perf(modelo_plsda_final, validation = "Mfold", folds = 5, nrepeat = 10, progressBar = TRUE)
+plot(perf_plsda)  # ver tasa de error por número de componentes
+
+# Extraer métricas de error
+# Error 1: global usando 2 componentes y distancia por centroides
+perf_plsda$error.rate$overall["comp2", "centroids.dist"]
+
+# Error 2: Error por clase usando 2 componentes y distancia por centroides
+perf_plsda$error.rate.class$centroids.dist[, "comp2"]
+
+# 3. Número óptimo de componentes según error global (distancia centroides)
+perf_plsda$choice.ncomp["overall", "centroids.dist"]
