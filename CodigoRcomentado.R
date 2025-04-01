@@ -401,3 +401,37 @@ perf_plsda$error.rate.class$centroids.dist[, "comp2"]
 
 # 3. Número óptimo de componentes según error global (distancia centroides)
 perf_plsda$choice.ncomp["overall", "centroids.dist"]
+
+# 4. Proyectar variables latentes
+# 4.1 Proyección de individuos (samples)
+plotIndiv(modelo_plsda_final, 
+          comp = c(1, 2), 
+          group = Y_train, 
+          legend = TRUE,
+          ellipse = TRUE, 
+          title = "Proyección PLS-DA (GC vs HE)")
+# 4.2 Carga de metabolitos
+plotVar(modelo_plsda_final, 
+        comp = c(1, 2), 
+        cex = 2, 
+        title = "Metabolitos más relevantes (carga)")
+
+# 5. Determinar las variables más importantes
+# Obtener los VIPscores
+vip_scores <- vip(modelo_plsda_final)
+head(vip_scores)
+
+# Convertimos los VIPs del componente 1 a data frame
+vip_df <- data.frame(Metabolito = rownames(vip_scores),
+                     VIP = vip_scores[, 1])
+
+# Ordenamos por importancia
+vip_df <- vip_df[order(-vip_df$VIP), ]
+
+# Gráfico de barras de los VIPs
+ggplot(vip_df[1:10, ], aes(x = reorder(Metabolito, VIP), y = VIP)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 metabolitos más importantes (VIP - Comp 1)",
+       x = "Metabolito", y = "VIP Score") +
+  theme_minimal()
