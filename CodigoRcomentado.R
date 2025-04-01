@@ -105,4 +105,13 @@ dim(se_filtrado)
 #guardo también el SE ya filtrado por calidad
 save(se, file = "SE_GastCancer_filtrado.Rda")
 
+#Guardado de datos en formato txt
+#Guardado de elementos 1:Guardar la matriz de datos
+write.table(assay(se_filtrado), file = "datos_matriz.txt", sep = "\t", quote = FALSE, row.names = TRUE)
+
+#Guardado de elementos 2: Guardar los metadatos de las muestras (colData)
+write.table(as.data.frame(colData(se_filtrado)), file = "metadatos_muestras.txt", sep = "\t", quote = FALSE, row.names = TRUE)
+
+#Guardado de elementos 3: Guardar metadatos de variables(rowData)
+write.table(as.data.frame(rowData(se_filtrado)), file = "metadatos_variables.txt", sep = "\t", quote = FALSE, row.names = TRUE)
 
