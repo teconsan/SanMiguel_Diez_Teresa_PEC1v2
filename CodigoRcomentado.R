@@ -68,11 +68,11 @@ head(picos)
 glimpse(datos)#inspección rápid para ver NA, si las variables son factor, chr etc
 glimpse(picos) #lo mismo con la otra pestaña del excel
 
-matriz_datos <- as.matrix(datos %>% select(starts_with("M"))) #Preparación de la matriz de expresión de datos omicos
+matriz_datos <- as.matrix(datos %>% dplyr::select(starts_with("M"))) #Preparación de la matriz de expresión de datos omicos
 matriz_datos <- t(matriz_datos)  # la transpongo 149 metabolitos × 140 muestras
 
 meta_muestras <- datos %>% #Preparación de la información sobre las muestras incluidas
-  select(Idx, SampleID, SampleType, Class) %>% 
+  dplyr::select(Idx, SampleID, SampleType, Class) %>% 
   column_to_rownames("SampleID")  # Entre IDx y SampleID, elijo SampleID como rownames
 
 colnames(matriz_datos) <- rownames(meta_muestras) #Identificación de muestras en la cabecera
@@ -158,7 +158,7 @@ df_loadings$contrib_total <- df_loadings$contrib_PC1 + df_loadings$contrib_PC2
 # Paso 3: Crear tabla con nombres de metabolitos
 df_nombres <- as.data.frame(rowData(se_filtrado)) %>%
   mutate(M_ID = rownames(.)) %>%
-  select(M_ID, Nombre = Label)
+  dplyr::select(M_ID, Nombre = Label)
 
 # Paso 4: Unir ambas tablas por M_ID
 df_completo <- left_join(df_loadings, df_nombres, by = "M_ID")
@@ -166,7 +166,7 @@ df_completo <- left_join(df_loadings, df_nombres, by = "M_ID")
 # Paso 5: Ordenar por contribución total
 df_ordenado <- df_completo %>%
   arrange(desc(contrib_total)) %>%
-  select(Nombre, M_ID, PC1, PC2, contrib_PC1, contrib_PC2, contrib_total)
+  dplyr::select(Nombre, M_ID, PC1, PC2, contrib_PC1, contrib_PC2, contrib_total)
 
 # Mostrar los 10 principales
 head(df_ordenado, 10)
@@ -242,7 +242,7 @@ metanombres <- as.data.frame(rowData(se_filtrado))
 metanombres$metabolito <- rownames(metanombres)
 # Juntar con la tabla ordenada
 tabla_con_nombres <- tabla_ordenada %>%
-  left_join(metanombres %>% select(metabolito, Label), by = "metabolito") %>%
+  left_join(metanombres %>% dplyr::select(metabolito, Label), by = "metabolito") %>%
   relocate(Label, .after = metabolito)  # mover el nombre al lado del código
 head(tabla_con_nombres)
 
@@ -330,7 +330,7 @@ tabla_supuestos <- bind_rows(resultados_supuestos, .id = "metabolito")
 
 # Añadir nombres de metabolitos
 tabla_supuestos <- tabla_supuestos %>%
-  left_join(metanombres %>% select(metabolito, Label), by = "metabolito") %>%
+  left_join(metanombres %>% dplyr::select(metabolito, Label), by = "metabolito") %>%
   relocate(Label, .after = metabolito)
 
 # Ver los primeros resultados
