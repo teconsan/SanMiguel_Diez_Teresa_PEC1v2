@@ -435,3 +435,24 @@ ggplot(vip_df[1:10, ], aes(x = reorder(Metabolito, VIP), y = VIP)) +
   labs(title = "Top 10 metabolitos más importantes (VIP - Comp 1)",
        x = "Metabolito", y = "VIP Score") +
   theme_minimal()
+
+# 6. Evaluar el modelo con los datos de prueba-test
+# Vector de clases reales
+Y_test <- factor(metainfo_test$Class, levels = c("HE", "GC"))
+
+# Predecir
+predicciones <- predict(modelo_plsda_final, newdata = datostest_escalado)
+clases_predichas <- predicciones$class$max.dist[, 2]
+
+# Matriz de confusión
+confusion <- table(Real = Y_test, Predicho = clases_predichas)
+print(confusion)
+
+# HE = clase positiva
+sensibilidad <- confusion["HE", "HE"] / sum(confusion["HE", ])
+especificidad <- confusion["GC", "GC"] / sum(confusion["GC", ])
+sensibilidad
+especificidad
+
+# FIN DE MI PRIMER INTENTO DE PRUEBA (BUENO, MI PRIMERA ENTREGA DE UN INTENTO DE ANÁLISIS ÓMICO
+# INTENTOS PARA LLEGAR A ESTE ENTREGABLE HA HABIDO MUCHOS!)
