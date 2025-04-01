@@ -1,0 +1,38 @@
+---
+title: "Metadatos_PEC1"
+author: "San-Miguel T"
+date: "2025-04-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Descripción de los metadatos incluidos
+
+Este archivo describe los metadatos utilizados en el análisis de datos metabolómicos de pacientes con cáncer gástrico, obtenidos del repositorio [metaboData](https://github.com/nutrimetabolomics/metaboData), en concreto del archivo `GastricCancer_NMR.xlsx`.
+
+## 1. Metadatos de las muestras (`colData`)
+El archivo `metadatos_muestras.txt` contiene información de 140 muestras. Cada fila corresponde a una muestra, y las columnas incluyen:
+**Idx**: Identificador numérico de la muestra.  
+**SampleID**: Identificador único de la muestra (establecido como nombre de fila).  
+**SampleType**: Tipo de muestra (QC = control de calidad, Sample = muestra).  
+**Class**: Grupo experimental (GC = cáncer gástrico, HE = sano, BN = benigno).
+
+# 2. Metadatos de las variables (`rowData`)
+
+El archivo `metadatos_variables.txt` contiene información sobre los metabolitos cuantificados (filas de la matriz de expresión):
+
+- **Idx**: Identificador numérico del metabolito.
+- **Label**: Nombre del metabolito.
+- **Perc_missing**: Porcentaje de datos faltantes.
+- **QC_RSD**: Coeficiente de variación en controles de calidad.
+
+Estos metadatos provienen de la hoja "Peak" del archivo Excel original.
+
+---
+
+**Fecha de creación**: `r Sys.Date()`
+
+**Autor**: Teresa San Miguel Díez
