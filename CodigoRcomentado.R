@@ -115,3 +115,28 @@ write.table(as.data.frame(colData(se_filtrado)), file = "metadatos_muestras.txt"
 #Guardado de elementos 3: Guardar metadatos de variables(rowData)
 write.table(as.data.frame(rowData(se_filtrado)), file = "metadatos_variables.txt", sep = "\t", quote = FALSE, row.names = TRUE)
 
+#ANÁLISIS DE LOS DATOS
+#1. ANÁLISIS PCA
+#1.1 Transformación log10 para reducir efecto de valores extremos
+#Filtramos/extraemos las muestras de la matriz del se_filtado, que están en assay
+datos_raw <- assay(se_filtrado)  # 52 metabs × 140 muestras
+#Transponemos muestras como filas
+datos_raw <- t(datos_raw)  # 140 filas (muestras), 52 columnas (metabolitos)
+#Hacemos el log10
+# Log-transformación (añadiendo +1 para evitar log(0))
+datos_log <- log10(datos_raw + 1)
+
+#1.2 Imputación k-NN mejor que imputación medianas k=3
+datos_knn <- kNN(as.data.frame(datos_log), k = 3, imp_var = FALSE)
+datos_knn <- as.matrix(datos_knn)  # Para asegurarnos de que sea matriz
+
+#1.3 Análisis PCA
+res.pca <- prcomp(datos_knn, scale. = TRUE)
+
+#1.4 Visualización PCA
+library(factoextra) 
+fviz_pca_ind(res.pca,
+             geom.ind = "point",
+             habillage = colData(se_filtrado)$SampleType,
+             addEllipses = TRUE,
+             title = "PCA con log10 + imputación k-NN (QC vs Sample)")
