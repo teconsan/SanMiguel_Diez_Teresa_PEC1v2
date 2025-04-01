@@ -140,3 +140,54 @@ fviz_pca_ind(res.pca,
              habillage = colData(se_filtrado)$SampleType,
              addEllipses = TRUE,
              title = "PCA con log10 + imputación k-NN (QC vs Sample)")
+#1.5 Tabla para ver la carga de cada metabolito
+# Paso 1: Extraer las cargas del PCA
+loadings <- res.pca$rotation
+df_loadings <- as.data.frame(loadings)
+df_loadings$M_ID <- rownames(df_loadings)  # Aquí están los M1, M2, ...
+
+# Paso 2: Calcular contribuciones
+df_loadings$contrib_PC1 <- df_loadings$PC1^2
+df_loadings$contrib_PC2 <- df_loadings$PC2^2
+df_loadings$contrib_total <- df_loadings$contrib_PC1 + df_loadings$contrib_PC2
+
+# Paso 3: Crear tabla con nombres de metabolitos
+df_nombres <- as.data.frame(rowData(se_filtrado)) %>%
+  mutate(M_ID = rownames(.)) %>%
+  select(M_ID, Nombre = Label)
+
+# Paso 4: Unir ambas tablas por M_ID
+df_completo <- left_join(df_loadings, df_nombres, by = "M_ID")
+
+# Paso 5: Ordenar por contribución total
+df_ordenado <- df_completo %>%
+  arrange(desc(contrib_total)) %>%
+  select(Nombre, M_ID, PC1, PC2, contrib_PC1, contrib_PC2, contrib_total)
+
+# Mostrar los 10 principales
+head(df_ordenado, 10)
+
+#1.6 Gráficos
+#1.6.1 Gráfico estático de cargas
+df_cargas <- df_ordenado
+
+ggplot(df_cargas, aes(x = PC1, y = PC2, label = Nombre)) +
+  geom_point(color = "green", size = 3) +
+  geom_text(vjust = -0.5, hjust = 0.5, color = "black", size = 3) +
+  labs(title = "PCA Loadings",
+       x = "PC1",
+       y = "PC2") +
+  theme_minimal()
+
+#1.6.2 Gráfico "interactivo" para verlo online
+plot_ly(data = df_cargas,
+        x = ~PC1,
+        y = ~PC2,
+        type = 'scatter',
+        mode = 'markers',
+        text = ~Nombre,
+        hoverinfo = 'text',
+        marker = list(size = 8, color = 'green')) %>%
+  layout(title = "PCA Loadings (interactivo)",
+         xaxis = list(title = "PC1"),
+         yaxis = list(title = "PC2"))
